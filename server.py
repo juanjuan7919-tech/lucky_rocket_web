@@ -1,7 +1,6 @@
 import asyncio
 import random
-from fastapi import FastAPI, WebSocket
-import uvicorn
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 app = FastAPI()
 
@@ -26,40 +25,38 @@ class Game:
 game = Game()
 
 # =========================
-# 🌐 WebSocket连接
-# =========================
-@app.websocket("/ws")
-async def ws(websocket: WebSocket):
-    await websocket.accept()
-    clients.add(websocket)
-
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except:
-        clients.remove(websocket)
-
-# =========================
-# 📡 广播消息
+# 📡 广播
 # =========================
 async def broadcast(data):
     dead = []
 
-    for ws in clients:
+    for ws in list(clients):
         try:
             await ws.send_json(data)
         except:
             dead.append(ws)
 
     for d in dead:
-        clients.remove(d)
+        clients.discard(d)
+
+# =========================
+# 🌐 WebSocket
+# =========================
+@app.websocket("/ws")
+async def ws_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    clients.add(websocket)
+
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        clients.discard(websocket)
 
 # =========================
 # 🚀 游戏循环
 # =========================
-async def loop():
-    global game
-
+async def game_loop():
     while True:
         game.reset()
 
@@ -89,8 +86,5 @@ async def loop():
 # 🚀 启动
 # =========================
 @app.on_event("startup")
-async def start():
-    asyncio.create_task(loop())
-
-if __name__ == "__main__":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+async def startup():
+    asyncio.create_task(game_loop())
