@@ -2,18 +2,22 @@
 <html>
 <head>
     <title>Lucky Rocket</title>
+
     <style>
         body {
+            margin: 0;
             background: #0b0f1a;
             color: white;
             text-align: center;
             font-family: Arial;
+            overflow: hidden;
         }
 
         #m {
-            font-size: 80px;
+            font-size: 90px;
             color: #00ffcc;
             margin-top: 120px;
+            text-shadow: 0 0 20px #00ffcc;
         }
 
         #status {
@@ -31,11 +35,37 @@
 <div id="status">Connecting...</div>
 
 <script>
-let ws = new WebSocket("ws://127.0.0.1:8000/ws");
+/* =========================
+   🌐 自动识别本地 / 线上
+========================= */
+
+const isLocal = location.hostname === "127.0.0.1" || location.hostname === "localhost";
+
+const wsUrl = isLocal
+    ? "ws://127.0.0.1:8000/ws"
+    : "wss://lucky-rocket-web.onrender.com/ws";
+
+let ws = new WebSocket(wsUrl);
+
+/* =========================
+   📡 连接状态
+========================= */
 
 ws.onopen = () => {
     document.getElementById("status").innerText = "Connected ✅";
 };
+
+ws.onclose = () => {
+    document.getElementById("status").innerText = "Disconnected ❌";
+};
+
+ws.onerror = () => {
+    document.getElementById("status").innerText = "Error ⚠️";
+};
+
+/* =========================
+   🚀 游戏数据
+========================= */
 
 ws.onmessage = (e) => {
     let d = JSON.parse(e.data);
