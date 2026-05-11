@@ -1,13 +1,14 @@
 import asyncio
 import random
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 
 app = FastAPI()
 
 clients = set()
 
 # =========================
-# 🚀 游戏核心
+# 🚀 游戏逻辑
 # =========================
 class Game:
     def __init__(self):
@@ -15,35 +16,60 @@ class Game:
 
     def reset(self):
         self.multiplier = 1.0
-        self.crash = self.generate_crash()
-
-    def generate_crash(self):
-        r = random.random()
-        crash = (1 / (1 - r + 0.01)) * 0.95
-        return round(max(1.2, min(crash, 30)), 2)
+        self.crash = round(random.uniform(1.5, 10), 2)
 
 game = Game()
 
 # =========================
-# 📡 广播
+# 🌐 首页（关键！解决 Not Found）
 # =========================
-async def broadcast(data):
-    dead = []
+@app.get("/")
+def home():
+    return HTMLResponse("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lucky Rocket</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0b0f1a;
+            color: white;
+            text-align: center;
+            font-family: Arial;
+        }
+        #m {
+            font-size: 80px;
+            color: #00ffcc;
+            margin-top: 120px;
+        }
+    </style>
+</head>
+<body>
 
-    for ws in list(clients):
-        try:
-            await ws.send_json(data)
-        except:
-            dead.append(ws)
+<h1>🚀 Lucky Rocket</h1>
+<div id="m">1.00x</div>
 
-    for d in dead:
-        clients.discard(d)
+<script>
+let ws = new WebSocket("wss://lucky-rocket-web.onrender.com/ws");
+
+ws.onmessage = (e) => {
+    let d = JSON.parse(e.data);
+    if (d.type === "tick") {
+        document.getElementById("m").innerText = d.m + "x";
+    }
+};
+</script>
+
+</body>
+</html>
+""")
 
 # =========================
 # 🌐 WebSocket
 # =========================
 @app.websocket("/ws")
-async def ws_endpoint(websocket: WebSocket):
+async def ws(websocket: WebSocket):
     await websocket.accept()
     clients.add(websocket)
 
@@ -54,16 +80,21 @@ async def ws_endpoint(websocket: WebSocket):
         clients.discard(websocket)
 
 # =========================
+# 📡 广播
+# =========================
+async def broadcast(data):
+    for ws in list(clients):
+        try:
+            await ws.send_json(data)
+        except:
+            clients.discard(ws)
+
+# =========================
 # 🚀 游戏循环
 # =========================
-async def game_loop():
+async def loop():
     while True:
         game.reset()
-
-        await broadcast({
-            "type": "start",
-            "crash": game.crash
-        })
 
         while game.multiplier < game.crash:
             await asyncio.sleep(0.3)
@@ -75,16 +106,8 @@ async def game_loop():
                 "m": game.multiplier
             })
 
-        await broadcast({
-            "type": "crash",
-            "crash": game.crash
-        })
-
         await asyncio.sleep(3)
 
-# =========================
-# 🚀 启动
-# =========================
 @app.on_event("startup")
 async def startup():
-    asyncio.create_task(game_loop())
+    asyncio.create_task(loop())
