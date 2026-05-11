@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Lucky Rocket</title>
+    <style>
+        body {
+            background: #0b0f1a;
+            color: white;
+            text-align: center;
+            font-family: Arial;
+        }
+
+        #m {
+            font-size: 80px;
+            color: #00ffcc;
+            margin-top: 120px;
+        }
+
+        #status {
+            margin-top: 20px;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+
+<h1>🚀 Lucky Rocket</h1>
+
+<div id="m">1.00x</div>
+<div id="status">Connecting...</div>
+
+<script>
+let ws = new WebSocket("ws://127.0.0.1:8000/ws");
+
+ws.onopen = () => {
+    document.getElementById("status").innerText = "Connected ✅";
+};
+
+ws.onmessage = (e) => {
+    let d = JSON.parse(e.data);
+
+    if (d.type === "tick") {
+        document.getElementById("m").innerText = d.m + "x";
+    }
+
+    if (d.type === "start") {
+        document.getElementById("status").innerText = "🚀 Running";
+    }
+
+    if (d.type === "crash") {
+        document.getElementById("status").innerText =
+            "💥 CRASH at " + d.crash;
+    }
+};
+</script>
+
+</body>
+</html>
